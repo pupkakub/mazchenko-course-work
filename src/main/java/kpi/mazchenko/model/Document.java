@@ -5,7 +5,7 @@ import java.util.Set;
 public class Document {
     private final int id;
     private final String text;
-    private Set<String> shingles;
+    private volatile Set<String> shingles;
 
     public Document(int id, String text) {
         this.id = id;
