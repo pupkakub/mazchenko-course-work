@@ -49,31 +49,47 @@ public class DocumentGenerator {
             "king", "space", "heard", "best", "hour", "better", "during", "hundred"
     };
 
+    private static final int MAX_OVERLAP_SOURCES = 3;
+
     public static List<Document> generate(int count, int wordsPerDoc, double overlapFraction, long seed) {
         Random random = new Random(seed);
+        List<String[]> generatedWords = new ArrayList<>(count);
         List<Document> docs = new ArrayList<>(count);
-        String[] previousWords = null;
 
         for (int i = 0; i < count; i++) {
-            String[] words = buildWordArray(wordsPerDoc, previousWords, overlapFraction, random);
+            String[] words = buildWordArray(wordsPerDoc, generatedWords, overlapFraction, random);
+            generatedWords.add(words);
             docs.add(new Document(i + 1, String.join(" ", words)));
-            previousWords = words;
         }
         return docs;
     }
 
-    public static List<Document> generate(int count, int wordsPerDoc, long seed) {
-        return generate(count, wordsPerDoc, 0.0, seed);
-    }
-
-    private static String[] buildWordArray(int length, String[] previous, double overlapFraction, Random rng) {
+    private static String[] buildWordArray(int length, List<String[]> previous, double overlapFraction, Random rng) {
         String[] result = new String[length];
-        int overlapCount = (previous == null) ? 0 : (int) (length * overlapFraction);
 
-        if (overlapCount > 0 && previous.length >= overlapCount) {
-            int startSrc = rng.nextInt(previous.length - overlapCount + 1);
-            int startDst = rng.nextInt(length - overlapCount + 1);
-            System.arraycopy(previous, startSrc, result, startDst, overlapCount);
+        if (!previous.isEmpty() && overlapFraction > 0) {
+            int sourcesCount = Math.min(previous.size(), MAX_OVERLAP_SOURCES);
+            int overlapPerSource = (int) (length * overlapFraction / sourcesCount);
+
+            for (int s = 0; s < sourcesCount; s++) {
+                if (overlapPerSource == 0)
+                    break;
+                String[] source = previous.get(previous.size() - 1 - rng.nextInt(previous.size()));
+                if (source.length < overlapPerSource)
+                    continue;
+
+                int startSrc = rng.nextInt(source.length - overlapPerSource + 1);
+                int startDst;
+                int attempts = 0;
+                do {
+                    startDst = rng.nextInt(length - overlapPerSource + 1);
+                    attempts++;
+                } while (hasOverlap(result, startDst, overlapPerSource) && attempts < 10);
+
+                if (!hasOverlap(result, startDst, overlapPerSource)) {
+                    System.arraycopy(source, startSrc, result, startDst, overlapPerSource);
+                }
+            }
         }
 
         for (int i = 0; i < length; i++) {
@@ -82,5 +98,13 @@ public class DocumentGenerator {
             }
         }
         return result;
+    }
+
+    private static boolean hasOverlap(String[] result, int start, int length) {
+        for (int i = start; i < start + length; i++) {
+            if (result[i] != null)
+                return true;
+        }
+        return false;
     }
 }

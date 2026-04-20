@@ -23,8 +23,12 @@ public class ResemblanceScore {
         return score;
     }
 
+    public double getScorePercent() {
+        return score * 100.0;
+    }
+
     @Override
     public String toString() {
-        return String.format("Document %d and Document %d | Score: %.4f", docId1, docId2, score);
+        return String.format("Doc %d <-> Doc %d | Resemblance: %.2f%%", docId1, docId2, getScorePercent());
     }
 }

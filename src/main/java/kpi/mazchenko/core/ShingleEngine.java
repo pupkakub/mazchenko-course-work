@@ -12,7 +12,9 @@ public class ShingleEngine {
         for (int i = 0; i <= words.length - w; i++) {
             StringBuilder shingle = new StringBuilder();
             for (int j = 0; j < w; j++) {
-                shingle.append(words[i + j]).append(j < w - 1 ? " " : "");
+                if (j > 0)
+                    shingle.append(' ');
+                shingle.append(words[i + j]);
             }
             shingles.add(shingle.toString());
         }
@@ -22,9 +24,14 @@ public class ShingleEngine {
     public static double calculateJaccard(Set<String> setA, Set<String> setB) {
         if (setA.isEmpty() || setB.isEmpty())
             return 0.0;
-        Set<String> intersection = new HashSet<>(setA);
-        intersection.retainAll(setB);
-        int unionSize = setA.size() + setB.size() - intersection.size();
-        return unionSize == 0 ? 0.0 : (double) intersection.size() / unionSize;
+        Set<String> smaller = setA.size() <= setB.size() ? setA : setB;
+        Set<String> larger = setA.size() <= setB.size() ? setB : setA;
+        int intersectionSize = 0;
+        for (String s : smaller) {
+            if (larger.contains(s))
+                intersectionSize++;
+        }
+        int unionSize = setA.size() + setB.size() - intersectionSize;
+        return unionSize == 0 ? 0.0 : (double) intersectionSize / unionSize;
     }
 }
