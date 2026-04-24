@@ -57,7 +57,7 @@ public class ResultVisualizer {
         drawLine(g, results, maxThreads, maxY, chartW, chartH, r -> r.realSpeedup);
 
         drawLegend(g, new String[] { "Ідеальне прискорення", "Реальне прискорення" },
-                new Color[] { COLOR_IDEAL, COLOR_PC1 }, new boolean[] { true, false });
+                new Color[] { COLOR_IDEAL, COLOR_PC1 }, new boolean[] { true, false }, PAD_LEFT + 20, PAD_TOP + 20);
 
         g.dispose();
         ImageIO.write(img, "png", new File("results/speedup.png"));
@@ -66,6 +66,8 @@ public class ResultVisualizer {
     private static void drawEfficiencyChart(List<BenchmarkResult> results, int maxThreads) throws Exception {
         BufferedImage img = newImage();
         Graphics2D g = setup(img);
+        int legendX = W - PAD_RIGHT - 190;
+        int legendY = PAD_TOP + 30;
 
         int chartH = H - PAD_TOP - PAD_BOTTOM;
         int chartW = W - PAD_LEFT - PAD_RIGHT;
@@ -83,7 +85,7 @@ public class ResultVisualizer {
         drawLine(g, results, maxThreads, maxY, chartW, chartH, r -> r.realEfficiency);
 
         drawLegend(g, new String[] { "Ідеальна ефективність (E=1)", "Реальна ефективність" },
-                new Color[] { COLOR_IDEAL, COLOR_PC1 }, new boolean[] { true, false });
+                new Color[] { COLOR_IDEAL, COLOR_PC1 }, new boolean[] { true, false }, legendX, legendY);
 
         g.dispose();
         ImageIO.write(img, "png", new File("results/efficiency.png"));
@@ -150,7 +152,7 @@ public class ResultVisualizer {
         }
 
         drawLegend(g, new String[] { "Прискорення від обсягу даних" }, new Color[] { COLOR_DATA },
-                new boolean[] { false });
+                new boolean[] { false }, PAD_LEFT + 20, PAD_TOP + 20);
 
         g.dispose();
         ImageIO.write(img, "png", new File("results/data_scalability.png"));
@@ -268,9 +270,7 @@ public class ResultVisualizer {
         }
     }
 
-    private static void drawLegend(Graphics2D g, String[] labels, Color[] colors, boolean[] dashed) {
-        int lx = PAD_LEFT + 20;
-        int ly = PAD_TOP + 20;
+    private static void drawLegend(Graphics2D g, String[] labels, Color[] colors, boolean[] dashed, int x, int y) {
         g.setFont(new Font("SansSerif", Font.PLAIN, 11));
         for (int i = 0; i < labels.length; i++) {
             g.setColor(colors[i]);
@@ -280,10 +280,10 @@ public class ResultVisualizer {
             } else {
                 g.setStroke(new BasicStroke(2.5f));
             }
-            g.drawLine(lx, ly + i * 20, lx + 30, ly + i * 20);
+            g.drawLine(x, y + i * 20, x + 30, y + i * 20);
             g.setColor(Color.BLACK);
             g.setStroke(new BasicStroke(1f));
-            g.drawString(labels[i], lx + 38, ly + i * 20 + 4);
+            g.drawString(labels[i], x + 38, y + i * 20 + 4);
         }
     }
 
