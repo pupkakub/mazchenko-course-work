@@ -96,19 +96,19 @@ public class Main {
         double tSeq = measureSeq(seq, docs);
 
         List<BenchmarkResult> results = new ArrayList<>();
-        System.out.printf("%-8s | %-10s | %-10s | %-8s | %-12s | %-15s%n",
-                "Threads", "Seq(ms)", "Par(ms)", "Speedup", "Efficiency", "SerialFraction");
+        System.out.printf("%-8s | %-10s | %-10s | %-8s | %-12s%n",
+                "Threads", "Seq(ms)", "Par(ms)", "Speedup", "Efficiency");
         System.out.println("-".repeat(72));
 
         for (int p = 1; p <= maxThreads; p++) {
             ForkJoinAnalyzer fjp = new ForkJoinAnalyzer(p);
             double tPar = measurePar(fjp, docs, forkThreshold);
             fjp.shutdown();
-            BenchmarkResult r = new BenchmarkResult(SCALABILITY_N, p, tSeq, tPar);
+            BenchmarkResult r = new BenchmarkResult(SCALABILITY_N, p, maxThreads, tSeq, tPar);
             results.add(r);
-            System.out.printf("%-8d | %-10.2f | %-10.2f | %-8.2f | %-12.4f | %-15.5f%n",
+            System.out.printf("%-8d | %-10.2f | %-10.2f | %-8.2f | %-12.4f%n",
                     r.parallelism, r.avgSingleMs, r.avgParallelMs,
-                    r.realSpeedup, r.realEfficiency, r.serialFraction);
+                    r.realSpeedup, r.realEfficiency);
         }
         return results;
     }
@@ -127,7 +127,7 @@ public class Main {
             List<Document> docs = DocumentGenerator.generate(n, WORDS_PER_DOC, GEN_OVERLAP, 42L);
             double tSeq = measureSeq(seq, docs);
             double tPar = measurePar(fjp, docs, forkThreshold);
-            BenchmarkResult r = new BenchmarkResult(n, maxThreads, tSeq, tPar);
+            BenchmarkResult r = new BenchmarkResult(n, maxThreads, maxThreads, tSeq, tPar);
             results.add(r);
             System.out.printf("%-8d | %-10.2f | %-10.2f | %-8.2f | %-12.4f%n",
                     n, r.avgSingleMs, r.avgParallelMs, r.realSpeedup, r.realEfficiency);

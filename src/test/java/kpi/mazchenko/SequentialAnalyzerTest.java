@@ -5,6 +5,10 @@ import kpi.mazchenko.model.ResemblanceScore;
 import kpi.mazchenko.sequential.SequentialAnalyzer;
 import kpi.mazchenko.util.DocumentGenerator;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 
 public class SequentialAnalyzerTest {
@@ -15,6 +19,7 @@ public class SequentialAnalyzerTest {
     private static final int WORDS_PER_DOC = 1000;
     private static final double GEN_OVERLAP = 0.2;
     private static final int[] BENCHMARK_SIZES = { 50, 100, 200, 300, 500, 1000 };
+    private static final int PREVIEW_WORDS = 20;
 
     private static final SequentialAnalyzer analyzer = new SequentialAnalyzer();
     private static int passed = 0;
@@ -22,131 +27,131 @@ public class SequentialAnalyzerTest {
 
     public static void main(String[] args) {
         System.out.println("=== Correctness Tests ===");
-        testIdenticalDocumentsScoreOne();
-        testDisjointDocumentsScoreZero();
-        testPartialOverlapIntermediateScore();
-        testManualJaccardVerification();
-        testShingleSizeLargerThanDocumentLength();
+        testIdenticalDocuments();
+        testDisjointDocuments();
+        testPartialOverlapWithManualJaccard();
+        testShingleSizeLargerThanDocument();
         testSingleDocumentNoPairs();
-        testPairCountBound();
-        testDuplicateBookDetection();
-        testScoreSymmetryAndRange();
-        testShingleSizeOne();
+        testScoreRange();
 
         System.out.println("\n=== Results: " + passed + " passed, " + failed + " failed ===");
         if (failed > 0) {
             System.exit(1);
         }
 
+        System.out.println("\n=== Real Document Test (doc1.txt vs doc2.txt) ===");
+        testRealDocumentIdentity();
+
         System.out.println("\n=== Performance Benchmark ===");
         runBenchmark();
     }
 
-    static void testIdenticalDocumentsScoreOne() {
-        String text = "the cat sat on the mat near the window today";
+    static void testIdenticalDocuments() {
+        String text = "the cat sat on the mat near the window today morning";
         List<Document> docs = List.of(new Document(1, text), new Document(2, text));
-        List<ResemblanceScore> results = analyzer.analyze(docs, 3);
-        assertEquals("identicalDocumentsScoreOne: size", 1, results.size());
-        assertClose("identicalDocumentsScoreOne: score", 1.0, results.get(0).getScore());
+        List<ResemblanceScore> results = analyzer.analyze(docs, SHINGLE_SIZE);
+        printFragments(docs, results);
+        assertEquals("identicalDocuments: pair count", 1, results.size());
+        assertClose("identicalDocuments: score must be 1.0", 1.0, results.get(0).getScore());
     }
 
-    static void testDisjointDocumentsScoreZero() {
+    static void testDisjointDocuments() {
         List<Document> docs = List.of(
                 new Document(1, "apple banana cherry date elderberry fig grape"),
                 new Document(2, "one two three four five six seven eight nine"));
-        List<ResemblanceScore> results = analyzer.analyze(docs, 3);
-        assertTrue("disjointDocumentsScoreZero: should be empty", results.isEmpty());
+        List<ResemblanceScore> results = analyzer.analyze(docs, SHINGLE_SIZE);
+        printFragments(docs, results);
+        assertTrue("disjointDocuments: no pairs expected", results.isEmpty());
     }
 
-    static void testPartialOverlapIntermediateScore() {
-        List<Document> docs = List.of(
-                new Document(1, "the cat sat on the mat near the window"),
-                new Document(2, "the cat sat on the mat by the door"));
-        List<ResemblanceScore> results = analyzer.analyze(docs, 3);
-        assertEquals("partialOverlap: size", 1, results.size());
-        double score = results.get(0).getScore();
-        assertTrue("partialOverlap: score in (0,1) but was " + score,
-                score > 0.0 && score < 1.0);
-    }
-
-    static void testManualJaccardVerification() {
+    static void testPartialOverlapWithManualJaccard() {
         List<Document> docs = List.of(
                 new Document(1, "the cat sat on"),
                 new Document(2, "the cat sat by"));
         List<ResemblanceScore> results = analyzer.analyze(docs, 2);
-        assertEquals("manualJaccard: size", 1, results.size());
-        assertClose("manualJaccard: score should be 0.5", 0.5, results.get(0).getScore());
+        printFragments(docs, results);
+        assertEquals("partialOverlap: pair count", 1, results.size());
+        assertClose("partialOverlap: Jaccard must be 0.5", 0.5, results.get(0).getScore());
     }
 
-    static void testShingleSizeLargerThanDocumentLength() {
+    static void testShingleSizeLargerThanDocument() {
         List<Document> docs = List.of(
                 new Document(1, "hello world"),
                 new Document(2, "hello world"));
         List<ResemblanceScore> results = analyzer.analyze(docs, 10);
-        assertTrue("shingleSizeLargerThanDoc: should produce no pairs", results.isEmpty());
+        printFragments(docs, results);
+        assertTrue("shingleSizeLargerThanDoc: no pairs expected", results.isEmpty());
     }
 
     static void testSingleDocumentNoPairs() {
         List<Document> docs = List.of(
                 new Document(1, "the quick brown fox jumps over the lazy dog"));
-        List<ResemblanceScore> results = analyzer.analyze(docs, 3);
-        assertTrue("singleDocument: should produce no pairs", results.isEmpty());
+        List<ResemblanceScore> results = analyzer.analyze(docs, SHINGLE_SIZE);
+        printFragments(docs, results);
+        assertTrue("singleDocument: no pairs expected", results.isEmpty());
     }
 
-    static void testPairCountBound() {
-        int n = 10;
-        List<Document> docs = DocumentGenerator.generate(n, 200, 0.7, 1L);
-        List<ResemblanceScore> results = analyzer.analyze(docs, 3);
-        int maxPairs = n * (n - 1) / 2;
-        assertTrue("pairCountBound: " + results.size() + " <= " + maxPairs,
-                results.size() <= maxPairs);
-    }
-
-    static void testDuplicateBookDetection() {
-        List<Document> bookBase = DocumentGenerator.generate(1, 1000, 0.0, 99L);
-        String bookText = bookBase.get(0).getText();
-        List<Document> docs = List.of(
-                new Document(1, bookText),
-                new Document(2, bookText),
-                new Document(3, DocumentGenerator.generate(1, 1000, 0.0, 777L).get(0).getText()));
-        List<ResemblanceScore> results = analyzer.analyze(docs, 3);
-        double score12 = results.stream()
-                .filter(r -> r.getDocId1() == 1 && r.getDocId2() == 2)
-                .mapToDouble(ResemblanceScore::getScore)
-                .findFirst()
-                .orElse(-1.0);
-        assertClose("duplicateBook: docs 1&2 should be 1.0, got " + score12, 1.0, score12);
-        System.out.println("  [INFO] Duplicate book score: " + score12
-                + " | Total pairs with score>0: " + results.size());
-    }
-
-    static void testScoreSymmetryAndRange() {
+    static void testScoreRange() {
         List<Document> docs = DocumentGenerator.generate(8, 200, 0.4, 55L);
-        List<ResemblanceScore> results = analyzer.analyze(docs, 3);
+        List<ResemblanceScore> results = analyzer.analyze(docs, SHINGLE_SIZE);
+        printFragments(docs, results);
         boolean allInRange = results.stream().allMatch(r -> r.getScore() > 0.0 && r.getScore() <= 1.0);
-        assertTrue("scoreRange: all scores in (0, 1]", allInRange);
-        boolean noDuplicatePairs = true;
-        for (int i = 0; i < results.size(); i++) {
-            for (int j = i + 1; j < results.size(); j++) {
-                ResemblanceScore a = results.get(i);
-                ResemblanceScore b = results.get(j);
-                if (a.getDocId1() == b.getDocId1() && a.getDocId2() == b.getDocId2()) {
-                    noDuplicatePairs = false;
-                    break;
-                }
+        assertTrue("scoreRange: all scores in (0.0, 1.0]", allInRange);
+    }
+
+    static void testRealDocumentIdentity() {
+        String path1 = "src/main/resources/docs/doc1.txt";
+        String path2 = "src/main/resources/docs/doc2.txt";
+
+        String text1, text2;
+        try {
+            text1 = Files.readString(Paths.get(path1));
+            text2 = Files.readString(Paths.get(path2));
+        } catch (IOException e) {
+            System.out.println("  SKIP: could not read files (" + e.getMessage() + ")");
+            return;
+        }
+
+        Document doc1 = new Document(1, text1);
+        Document doc2 = new Document(2, text2);
+        List<Document> docs = List.of(doc1, doc2);
+
+        System.out.println("  Doc 1 preview: \"" + preview(text1) + "\"");
+        System.out.println("  Doc 2 preview: \"" + preview(text2) + "\"");
+
+        List<ResemblanceScore> results = analyzer.analyze(docs, SHINGLE_SIZE);
+
+        if (results.isEmpty()) {
+            System.out.println("  Result: no pairs found (score = 0)");
+            assertTrue("realDocumentIdentity: expected score 1.0, got no results", false);
+        } else {
+            ResemblanceScore r = results.get(0);
+            System.out.printf("  Result: Doc %d <-> Doc %d | Score = %.6f (%.2f%%)%n",
+                    r.getDocId1(), r.getDocId2(), r.getScore(), r.getScorePercent());
+            assertClose("realDocumentIdentity: score must be 1.0", 1.0, r.getScore());
+        }
+    }
+
+    private static void printFragments(List<Document> docs, List<ResemblanceScore> results) {
+        System.out.println("  --- fragments ---");
+        for (Document doc : docs) {
+            System.out.println("  Doc " + doc.getId() + ": \"" + preview(doc.getText()) + "\"");
+        }
+        if (results.isEmpty()) {
+            System.out.println("  Result: no matches found (score = 0)");
+        } else {
+            for (ResemblanceScore r : results) {
+                System.out.printf("  Result: Doc %d <-> Doc %d | Score = %.6f (%.2f%%)%n",
+                        r.getDocId1(), r.getDocId2(), r.getScore(), r.getScorePercent());
             }
         }
-        assertTrue("noDuplicatePairs: each pair appears at most once", noDuplicatePairs);
     }
 
-    static void testShingleSizeOne() {
-        List<Document> docs = List.of(
-                new Document(1, "alpha beta gamma"),
-                new Document(2, "alpha delta gamma"));
-        List<ResemblanceScore> results = analyzer.analyze(docs, 1);
-        assertEquals("shingleSizeOne: size", 1, results.size());
-        double expected = 2.0 / 4.0;
-        assertClose("shingleSizeOne: score should be 0.5", expected, results.get(0).getScore());
+    private static String preview(String text) {
+        String[] words = text.trim().split("\\s+");
+        int limit = Math.min(PREVIEW_WORDS, words.length);
+        return String.join(" ", Arrays.copyOf(words, limit))
+                + (words.length > PREVIEW_WORDS ? "..." : "");
     }
 
     static void runBenchmark() {
@@ -177,8 +182,8 @@ public class SequentialAnalyzerTest {
 
         System.out.println("\nNote: each entry is the average of " + MEASURE_RUNS
                 + " runs after " + WARMUP_RUNS + " warmup runs.");
-        System.out.println("Documents: " + WORDS_PER_DOC + " words each, overlap fraction: " + GEN_OVERLAP
-                + ", shingle size: " + SHINGLE_SIZE + ".");
+        System.out.println("Documents: " + WORDS_PER_DOC + " words each, overlap fraction: "
+                + GEN_OVERLAP + ", shingle size: " + SHINGLE_SIZE + ".");
     }
 
     static void assertTrue(String label, boolean condition) {

@@ -7,6 +7,7 @@ import kpi.mazchenko.model.ResemblanceScore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.RecursiveTask;
 
@@ -22,9 +23,22 @@ public class ForkJoinAnalyzer {
         for (Document doc : documents) {
             doc.resetShingles();
         }
-        pool.invoke(new ShingleGenerationTask(documents, w, 0, documents.size(), forkThreshold));
 
         int n = documents.size();
+        int workers = pool.getParallelism();
+        int chunkSize = Math.max(1, (int) Math.ceil((double) n / workers));
+
+        List<ShingleGenerationTask> shingleTasks = new ArrayList<>();
+        for (int i = 0; i < n; i += chunkSize) {
+            shingleTasks.add(new ShingleGenerationTask(documents, w, i, Math.min(i + chunkSize, n)));
+        }
+
+        pool.invoke(new RecursiveAction() {
+            protected void compute() {
+                ForkJoinTask.invokeAll(shingleTasks);
+            }
+        });
+
         long[] rowOffsets = new long[n];
         long currentOffset = 0;
         for (int i = 0; i < n; i++) {
@@ -49,28 +63,19 @@ public class ForkJoinAnalyzer {
         private final int w;
         private final int start;
         private final int end;
-        private final int forkThreshold;
 
-        ShingleGenerationTask(List<Document> documents, int w, int start, int end, int forkThreshold) {
+        ShingleGenerationTask(List<Document> documents, int w, int start, int end) {
             this.documents = documents;
             this.w = w;
             this.start = start;
             this.end = end;
-            this.forkThreshold = forkThreshold;
         }
 
         @Override
         protected void compute() {
-            if (end - start <= forkThreshold) {
-                for (int i = start; i < end; i++) {
-                    Document doc = documents.get(i);
-                    doc.setShingles(ShingleEngine.extractShingles(doc.getText(), w));
-                }
-            } else {
-                int mid = start + (end - start) / 2;
-                invokeAll(
-                        new ShingleGenerationTask(documents, w, start, mid, forkThreshold),
-                        new ShingleGenerationTask(documents, w, mid, end, forkThreshold));
+            for (int i = start; i < end; i++) {
+                Document doc = documents.get(i);
+                doc.setShingles(ShingleEngine.extractShingles(doc.getText(), w));
             }
         }
     }

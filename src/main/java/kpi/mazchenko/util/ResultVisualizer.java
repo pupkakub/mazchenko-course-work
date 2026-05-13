@@ -167,8 +167,8 @@ public class ResultVisualizer {
         g.setColor(Color.WHITE);
         g.fillRect(0, 0, 820, tableH);
 
-        int[] colX = { 10, 110, 230, 360, 490, 630 };
-        String[] headers = { "Потоки", "Час (мс)", "Прискорення", "Ефективність", "Serial Fraction", "Cost" };
+        int[] colX = { 10, 110, 230, 360, 490 };
+        String[] headers = { "Потоки", "Час (мс)", "Прискорення", "Ефективність", "Вартість" };
 
         g.setColor(new Color(230, 230, 230));
         g.fillRect(0, 0, 820, 32);
@@ -186,13 +186,12 @@ public class ResultVisualizer {
                 g.fillRect(0, 32 + i * rowH, 820, rowH);
             }
             g.setColor(Color.BLACK);
-            double cost = r.avgParallelMs * r.parallelism;
+            double cost = r.avgParallelMs * r.maxThreads;
             String[] vals = {
                     String.valueOf(r.parallelism),
                     String.format("%.2f", r.avgParallelMs),
                     String.format("%.4f", r.realSpeedup),
                     String.format("%.4f", r.realEfficiency),
-                    String.format("%.5f", r.serialFraction),
                     String.format("%.2f", cost)
             };
             for (int j = 0; j < vals.length; j++) {
